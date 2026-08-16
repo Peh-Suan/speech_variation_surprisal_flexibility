@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<graph xmlns="http://www.xces.org/ns/GrAF/1.0/">
+    <header>
+        <tagsDecl>
+            <tagUsage gi="s" occurs="4"/>
+        </tagsDecl>
+        <annotationSets>
+            <annotationSet name="xces" type="http://www.xces.org/schema/2003"/>
+        </annotationSets>
+    </header>
+    <region xml:id="s-r0" anchors="38 47"/>
+    <node xml:id="s-n0">
+        <link targets="s-r0"/>
+    </node>
+    <a label="s" ref="s-n0" as="xces"/>
+    <region xml:id="s-r1" anchors="61 103"/>
+    <node xml:id="s-n1">
+        <link targets="s-r1"/>
+    </node>
+    <a label="s" ref="s-n1" as="xces">
+        <fs>
+            <f name="id" value="p1s1"/>
+        </fs>
+    </a>
+    <region xml:id="s-r2" anchors="117 1506"/>
+    <node xml:id="s-n2">
+        <link targets="s-r2"/>
+    </node>
+    <a label="s" ref="s-n2" as="xces">
+        <fs>
+            <f name="id" value="p2s1"/>
+        </fs>
+    </a>
+    <region xml:id="s-r3" anchors="1520 1537"/>
+    <node xml:id="s-n3">
+        <link targets="s-r3"/>
+    </node>
+    <a label="s" ref="s-n3" as="xces">
+        <fs>
+            <f name="id" value="p3s1"/>
+        </fs>
+    </a>
+</graph>

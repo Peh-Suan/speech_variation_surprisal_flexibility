@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<graph xmlns="http://www.xces.org/ns/GrAF/1.0/">
+    <header>
+        <tagsDecl>
+            <tagUsage gi="NounChunk" occurs="4"/>
+        </tagsDecl>
+        <dependencies>
+            <dependsOn type="hepple"/>
+        </dependencies>
+        <annotationSets>
+            <annotationSet name="xces" type="http://www.xces.org/schema/2003"/>
+        </annotationSets>
+    </header>
+    <node xml:id="np-n0"/>
+    <a label="NounChunk" ref="np-n0" as="xces"/>
+    <node xml:id="np-n1"/>
+    <a label="NounChunk" ref="np-n1" as="xces"/>
+    <node xml:id="np-n2"/>
+    <a label="NounChunk" ref="np-n2" as="xces"/>
+    <node xml:id="np-n3"/>
+    <a label="NounChunk" ref="np-n3" as="xces"/>
+    <edge xml:id="lnk5" from="np-n3" to="penn-n7"/>
+    <edge xml:id="lnk4" from="np-n2" to="penn-n5"/>
+    <edge xml:id="lnk3" from="np-n1" to="penn-n4"/>
+    <edge xml:id="lnk2" from="np-n0" to="penn-n2"/>
+    <edge xml:id="lnk1" from="np-n0" to="penn-n1"/>
+    <edge xml:id="lnk0" from="np-n0" to="penn-n0"/>
+</graph>

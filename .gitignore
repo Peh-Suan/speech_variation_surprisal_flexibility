@@ -1,0 +1,45 @@
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Environments
+.venv/
+venv/
+env/
+.env
+
+# Model checkpoints
+*.pt
+*.pth
+*.ckpt
+
+# Large/raw media data
+*.wav
+*.flac
+*.mp3
+*.mp4
+*.avi
+*.mov
+
+# Large scientific data, if these are raw datasets
+*.mat
+*.npy
+*.npz
+
+# Logs / temporary files
+*.log
+*.tmp
+
+# Large generated pronunciation/corpus data
+phone_based/pronunciation_counts/pronunciation_counts_fr.pkl
+phone_based/pronunciation_counts/pronunciation_dict_fr.pkl
+phone_based/pronunciation_counts/word_counts_fr.pkl
+
+textual_corpora/be/sentences.pickle

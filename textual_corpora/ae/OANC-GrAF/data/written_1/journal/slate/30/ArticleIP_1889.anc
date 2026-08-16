@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<cesHeader xmlns="http://www.xces.org/ns/GrAF/1.0/" creator="KBS" date.created="2005-9-5"
+           version="1.0.4">
+    <fileDesc>
+        <titleStmt>
+            <title>ArticleIP_1889</title>
+        </titleStmt>
+        <extent wordCount="994"/>
+        <sourceDesc>
+            <title>NAFTA Math</title>
+            <author>Jodie T. Allen</author>
+            <publisher type="org">Microsoft Corporation</publisher>
+            <pubDate value="1997-07-12">7/12/1997 4:30:00 PM</pubDate>
+            <pubName>Slate Magazine</pubName>
+            <pubPlace>http://www.slate.com</pubPlace>
+        </sourceDesc>
+    </fileDesc>
+    <profileDesc>
+        <textClass catRef="WR JO">
+            <domain>Periodicals</domain>
+            <subdomain>Specialized Magazine</subdomain>
+            <subject>Media Coverage</subject>
+            <audience>Adult</audience>
+            <medium>Journal</medium>
+        </textClass>
+        <primaryData loc="ArticleIP_1889.txt" medium="text"/>
+        <annotations>
+            <annotation ann.loc="ArticleIP_1889.txt" type="content">Document content</annotation>
+            <annotation ann.loc="ArticleIP_1889-logical.xml" type="logical">Logical document structure</annotation>
+            <annotation ann.loc="ArticleIP_1889-s.xml" type="s">Sentence boundaries</annotation>
+            <annotation ann.loc="ArticleIP_1889-hepple.xml" type="hepple">Hepple part of speech tags</annotation>
+            <annotation ann.loc="ArticleIP_1889-np.xml" type="np">Noun chunks</annotation>
+            <annotation ann.loc="ArticleIP_1889-vp.xml" type="vp">Verb chunks</annotation>
+        </annotations>
+    </profileDesc>
+    <revisionDesc>
+        <change>
+            <changeDate>2004-11-10</changeDate>
+            <respName>Keith Suderman</respName>
+            <item>Converted to 2nd release standoff off</item>
+        </change>
+    </revisionDesc>
+</cesHeader>

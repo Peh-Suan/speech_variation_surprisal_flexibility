@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<cesHeader xmlns="http://www.xces.org/ns/GrAF/1.0/" creator="KBS" date.created="2005-9-5"
+           version="1.0.4">
+    <fileDesc>
+        <titleStmt>
+            <title>Article247_3873</title>
+        </titleStmt>
+        <extent wordCount="629"/>
+        <sourceDesc>
+            <title>Shattering Glass-Steagall</title>
+            <author>Eve Gerber</author>
+            <publisher type="org">Microsoft Corporation</publisher>
+            <pubDate value="1999-10-23">10/23/1999 4:24:04 PM</pubDate>
+            <pubName>Slate Magazine</pubName>
+            <pubPlace>http://www.slate.com</pubPlace>
+        </sourceDesc>
+    </fileDesc>
+    <profileDesc>
+        <textClass catRef="WR JO">
+            <domain>Periodicals</domain>
+            <subdomain>Specialized Magazine</subdomain>
+            <subject>Media Coverage</subject>
+            <audience>Adult</audience>
+            <medium>Journal</medium>
+        </textClass>
+        <primaryData loc="Article247_3873.txt" medium="text"/>
+        <annotations>
+            <annotation ann.loc="Article247_3873.txt" type="content">Document content</annotation>
+            <annotation ann.loc="Article247_3873-logical.xml" type="logical">Logical document structure</annotation>
+            <annotation ann.loc="Article247_3873-s.xml" type="s">Sentence boundaries</annotation>
+            <annotation ann.loc="Article247_3873-hepple.xml" type="hepple">Hepple part of speech tags</annotation>
+            <annotation ann.loc="Article247_3873-np.xml" type="np">Noun chunks</annotation>
+            <annotation ann.loc="Article247_3873-vp.xml" type="vp">Verb chunks</annotation>
+        </annotations>
+    </profileDesc>
+    <revisionDesc>
+        <change>
+            <changeDate>2004-11-10</changeDate>
+            <respName>Keith Suderman</respName>
+            <item>Converted to 2nd release standoff off</item>
+        </change>
+        <change>
+            <changeDate>2007-11-02</changeDate>
+            <respName>Keith Suderman</respName>
+            <item>Added validated sentence annotations</item>
+        </change>
+        <change>
+            <changeDate>2007-11-02</changeDate>
+            <respName>Keith Suderman</respName>
+            <item>Added validated sentence annotations</item>
+        </change>
+    </revisionDesc>
+</cesHeader>

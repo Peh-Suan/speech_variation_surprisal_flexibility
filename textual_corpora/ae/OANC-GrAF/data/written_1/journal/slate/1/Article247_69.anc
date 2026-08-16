@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<cesHeader xmlns="http://www.xces.org/ns/GrAF/1.0/" creator="KBS" date.created="2005-9-5" version="1.0.4">
+   <fileDesc>
+      <titleStmt>
+         <title>Article247_69</title>
+      </titleStmt>
+        <extent wordCount="451"/>
+      <sourceDesc>
+         <title>Who's on Top?</title>
+         <author>Mickey Kaus</author>
+         <publisher type="org">Microsoft Corporation</publisher>
+         <pubDate value="1998-01-28">1/28/1998 6:36:00 PM</pubDate>
+         <pubName>Slate Magazine</pubName>
+         <pubPlace>http://www.slate.com/</pubPlace>
+      </sourceDesc>
+   </fileDesc>
+   <profileDesc>
+      <textClass catRef="WR JO">
+         <domain>Periodicals</domain>
+         <subdomain>Specialized Magazine</subdomain>
+         <subject>Media Coverage</subject>
+         <audience>Adult</audience>
+         <medium>Journal</medium>
+      </textClass>
+      <primaryData loc="Article247_69.txt" medium="text"/>
+      <annotations>
+         <annotation type="content" ann.loc="Article247_69.txt">Document content</annotation>
+         <annotation type="logical" ann.loc="Article247_69-logical.xml">Logical document structure</annotation>
+         <annotation type="s" ann.loc="Article247_69-s.xml">Sentence boundaries</annotation>
+         <annotation type="biber" ann.loc="Article247_69-biber.xml">Biber part of speech tags</annotation>
+         <annotation type="hepple" ann.loc="Article247_69-hepple.xml">Hepple part of speech tags</annotation>
+         <annotation type="np" ann.loc="Article247_69-np.xml">Noun chunks</annotation>
+         <annotation type="vp" ann.loc="Article247_69-vp.xml">Verb chunks</annotation>
+      </annotations>
+   </profileDesc>
+   <revisionDesc>
+      <change>
+         <changeDate>2004-11-10</changeDate>
+         <respName>Keith Suderman</respName>
+         <item>Converted to 2nd release standoff off</item>
+      </change>
+   </revisionDesc>
+</cesHeader>

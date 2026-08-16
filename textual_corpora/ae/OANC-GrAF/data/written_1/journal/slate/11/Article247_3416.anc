@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<cesHeader xmlns="http://www.xces.org/ns/GrAF/1.0/" creator="KBS" date.created="2005-9-5"
+           version="1.0.4">
+    <fileDesc>
+        <titleStmt>
+            <title>Article247_3416</title>
+        </titleStmt>
+        <extent wordCount="397"/>
+        <sourceDesc>
+            <title>Giuliani, Springsteen, and Other Bosses</title>
+            <author>Ellen Willis</author>
+            <publisher type="org">Microsoft Corporation</publisher>
+            <pubDate value="1999-08-16">8/16/1999 12:48:35 PM</pubDate>
+            <pubName>Slate Magazine</pubName>
+            <pubPlace>http://www.slate.com</pubPlace>
+        </sourceDesc>
+    </fileDesc>
+    <profileDesc>
+        <textClass catRef="WR JO">
+            <domain>Periodicals</domain>
+            <subdomain>Specialized Magazine</subdomain>
+            <subject>Media Coverage</subject>
+            <audience>Adult</audience>
+            <medium>Journal</medium>
+        </textClass>
+        <primaryData loc="Article247_3416.txt" medium="text"/>
+        <annotations>
+            <annotation ann.loc="Article247_3416.txt" type="content">Document content</annotation>
+            <annotation ann.loc="Article247_3416-logical.xml" type="logical">Logical document structure</annotation>
+            <annotation ann.loc="Article247_3416-s.xml" type="s">Sentence boundaries</annotation>
+            <annotation ann.loc="Article247_3416-hepple.xml" type="hepple">Hepple part of speech tags</annotation>
+            <annotation ann.loc="Article247_3416-np.xml" type="np">Noun chunks</annotation>
+            <annotation ann.loc="Article247_3416-vp.xml" type="vp">Verb chunks</annotation>
+        </annotations>
+    </profileDesc>
+    <revisionDesc>
+        <change>
+            <changeDate>2004-11-10</changeDate>
+            <respName>Keith Suderman</respName>
+            <item>Converted to 2nd release standoff off</item>
+        </change>
+        <change>
+            <changeDate>2007-11-02</changeDate>
+            <respName>Keith Suderman</respName>
+            <item>Added validated sentence annotations</item>
+        </change>
+    </revisionDesc>
+</cesHeader>

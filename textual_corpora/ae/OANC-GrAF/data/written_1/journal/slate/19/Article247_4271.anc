@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<cesHeader xmlns="http://www.xces.org/ns/GrAF/1.0/" creator="KBS" date.created="2005-9-5"
+           version="1.0.4">
+    <fileDesc>
+        <titleStmt>
+            <title>Article247_4271</title>
+        </titleStmt>
+        <extent wordCount="737"/>
+        <sourceDesc>
+            <title>Reality Bites Value America</title>
+            <author>James Surowiecki</author>
+            <publisher type="org">Microsoft Corporation</publisher>
+            <pubDate value="1999-12-30">12/30/1999 12:26:19 PM</pubDate>
+            <pubName>Slate Magazine</pubName>
+            <pubPlace>http://www.slate.com</pubPlace>
+        </sourceDesc>
+    </fileDesc>
+    <profileDesc>
+        <textClass catRef="WR JO">
+            <domain>Periodicals</domain>
+            <subdomain>Specialized Magazine</subdomain>
+            <subject>Media Coverage</subject>
+            <audience>Adult</audience>
+            <medium>Journal</medium>
+        </textClass>
+        <primaryData loc="Article247_4271.txt" medium="text"/>
+        <annotations>
+            <annotation ann.loc="Article247_4271.txt" type="content">Document content</annotation>
+            <annotation ann.loc="Article247_4271-logical.xml" type="logical">Logical document structure</annotation>
+            <annotation ann.loc="Article247_4271-s.xml" type="s">Sentence boundaries</annotation>
+            <annotation ann.loc="Article247_4271-hepple.xml" type="hepple">Hepple part of speech tags</annotation>
+            <annotation ann.loc="Article247_4271-np.xml" type="np">Noun chunks</annotation>
+            <annotation ann.loc="Article247_4271-vp.xml" type="vp">Verb chunks</annotation>
+        </annotations>
+    </profileDesc>
+    <revisionDesc>
+        <change>
+            <changeDate>2004-11-10</changeDate>
+            <respName>Keith Suderman</respName>
+            <item>Converted to 2nd release standoff off</item>
+        </change>
+    </revisionDesc>
+</cesHeader>
