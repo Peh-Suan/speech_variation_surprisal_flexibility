@@ -4,7 +4,8 @@ from .ipa_processing import (
     PHONE_NORMALIZATION,
     be_mfa_phone_to_phoneme,
     is_ae_non_speech,
-    is_ae_arpabet_phone
+    is_ae_arpabet_phone,
+    syllabify_ipa,
 )
 
 SAMPA2IPA = {
@@ -56,66 +57,124 @@ def alignment_to_dataframe(
     arpa_col=None,
     word_col=None,
     word_id_col=None,
+    unit_type="phoneme",
 ):
     """
-    Convert an alignment file / dataframe into a standardized phone-pair
-    dataframe.
+    Convert phone-level alignment data into a standardized contextual
+    dataframe at either the phoneme or syllable level.
 
     Parameters
     ----------
     source :
-        For fr/be:
-            A TextGrid object, or a path to a TextGrid.
+        Input alignment data.
 
-        For ae:
+        For ``fr`` and ``be``:
+            A TextGrid object containing word- and phone-level tiers.
+
+        For ``ae``:
             Either a pandas DataFrame containing phone-level ARPAbet
-            annotations, or a TextGrid object (MRI75 / MRI75-annotated).
+            annotations, or a TextGrid object containing word- and
+            phone-level tiers.
 
     lang : {"fr", "be", "ae"}
-        fr = French
-        be = British English
-        ae = American English
+        Language / variety:
+
+        - ``"fr"``: French
+        - ``"be"``: British English
+        - ``"ae"``: American English
 
     pronunciation_dict : dict, optional
-        Required by ipa_processing.word2ipa() for fr/be.
+        Pronunciation dictionary used by ``ipa_processing.word2ipa()``
+        for French and British English.
 
     preferred_ipas_f : str, optional
-        Required by ipa_processing.word2ipa() for ae.
+        Path to the preferred-IPA file used by
+        ``ipa_processing.word2ipa()`` for American English.
 
-    start_col, end_col, arpa_col, word_col, word_id_col :
-        Column names/indices for American-English dataframe input.
+    start_col, end_col, arpa_col, word_col, word_id_col : str or int, optional
+        Column names or indices used for American-English dataframe input.
 
-        If `word_id_col` is omitted and the input dataframe has no
-        ``word_id`` column, token IDs are inferred from contiguous changes
-        in the word label. TextGrid inputs receive word IDs directly from
-        their word intervals.
+        If omitted, the function attempts to infer the following formats:
 
-        If omitted, these are inferred:
-            named format:
-                "start", "end", "arpa", "word"
+        Named-column format:
+            ``"start"``, ``"end"``, ``"arpa"``, ``"word"``
 
-            old ae_ema / ae_mri format:
-                0, 1, 2, 3
+        Legacy AE EMA / MRI format:
+            columns ``0``, ``1``, ``2``, ``3``
+
+        ``word_id_col`` identifies individual word tokens. If it is omitted
+        and the dataframe has no ``word_id`` column, word-token IDs are
+        inferred from contiguous changes in the word label.
+
+        TextGrid inputs receive word-token IDs directly from their word
+        intervals.
+
+    unit_type : {"phoneme", "syllable"}, default="phoneme"
+        Linguistic unit used to construct the output dataframe.
+
+        If ``"phoneme"``, each output row represents an adjacent phoneme
+        pair within a word:
+
+            phone1 -> phone2
+
+        If ``"syllable"``, the aligned phone sequence is first syllabified
+        with ``ipa_processing.syllabify_ipa()``, and each output row
+        represents an adjacent syllable pair within a word:
+
+            syllable1 -> syllable2
+
+        Syllable start and end times are derived from the first and last
+        phone intervals belonging to each syllable.
 
     Returns
     -------
     pandas.DataFrame
-        Columns:
+        A contextual dataframe containing adjacent-unit pairs within each
+        word token.
 
-        phone1_start
-        phone1_end
-        phone2_start
-        phone2_end
-        phone1
-        phone2
-        context
-        word
-        word_id
+        If ``unit_type="phoneme"``, the columns are:
+
+            phone1_start
+            phone1_end
+            phone2_start
+            phone2_end
+            phone1
+            phone2
+            context
+            word
+            word_id
+
+        If ``unit_type="syllable"``, the columns are:
+
+            syllable1_start
+            syllable1_end
+            syllable2_start
+            syllable2_end
+            syllable1
+            syllable2
+            context
+            word
+            word_id
 
     Notes
     -----
-    `context` contains all preceding phones in the current word before
-    `phone2`. Therefore the last phone in `context` is always `phone1`.
+    The function first reconciles the observed phone alignment with the
+    lexical pronunciation of each word token. Timing information remains
+    tied to the original phone intervals.
+
+    ``context`` contains all units preceding the target unit within the
+    current word.
+
+    For phoneme output, phones in ``context`` are separated by ``"_"``.
+    Therefore, the final phone in ``context`` is always ``phone1``.
+
+    For syllable output, syllables in ``context`` are separated by ``"."``,
+    while phones within each syllable remain separated by ``"_"``.
+    Therefore, the final syllable in ``context`` is always ``syllable1``.
+
+    Monophonemic words do not contribute rows to phoneme-level output, and
+    monosyllabic words do not contribute rows to syllable-level output,
+    because there is no adjacent unit pair to represent.
     """
 
     import os
@@ -588,16 +647,28 @@ def alignment_to_dataframe(
         )
 
     # ============================================================
-    # Produce standardized phone-pair dataframe
+    # Produce standardized phoneme- or syllable-pair dataframe
     # ============================================================
 
+    unit_name = (
+        "phone"
+        if unit_type == "phoneme"
+        else "syllable"
+    )
+
+    context_sep = (
+        "_"
+        if unit_type == "phoneme"
+        else "."
+    )
+
     data = {
-        "phone1_start": [],
-        "phone1_end": [],
-        "phone2_start": [],
-        "phone2_end": [],
-        "phone1": [],
-        "phone2": [],
+        f"{unit_name}1_start": [],
+        f"{unit_name}1_end": [],
+        f"{unit_name}2_start": [],
+        f"{unit_name}2_end": [],
+        f"{unit_name}1": [],
+        f"{unit_name}2": [],
         "context": [],
         "word": [],
         "word_id": [],
@@ -635,52 +706,190 @@ def alignment_to_dataframe(
                 f"  intervals: {len(times)}"
             )
 
-        # --------------------------------------------------------
-        # Generate:
+        # ========================================================
+        # PHONEME
+        # ========================================================
+
+        if unit_type == "phoneme":
+
+            unit_records = [
+                {
+                    "label": phone,
+                    "start": start,
+                    "end": end,
+                }
+                for phone, (start, end) in zip(
+                    phones,
+                    times,
+                )
+            ]
+
+        # ========================================================
+        # SYLLABLE
+        # ========================================================
+
+        else:
+
+            # Example:
+            #
+            #   m_æ_s_k_ə_ɹ_eɪ_d
+            #
+            # might become:
+            #
+            #   m_æ_s.k_ə.ɹ_eɪ_d
+            #
+
+            syllabified = syllabify_ipa(
+                aligned_ipa,
+                lang=lang,
+                sep="_",
+            )
+
+            syllable_phone_lists = [
+                syllable.split("_")
+                for syllable in syllabified.split(".")
+                if syllable
+            ]
+
+            # ----------------------------------------------------
+            # Strong sanity check:
+            #
+            # Syllabification must ONLY add syllable boundaries.
+            # It must not add, remove, reorder, or change phones.
+            # ----------------------------------------------------
+
+            reconstructed_phones = [
+                phone
+                for syllable in syllable_phone_lists
+                for phone in syllable
+            ]
+
+            if reconstructed_phones != phones:
+                raise ValueError(
+                    "Syllabification changed the phone sequence.\n"
+                    f"  word: {word!r}\n"
+                    f"  original: {aligned_ipa}\n"
+                    f"  syllabified: {syllabified}\n"
+                    f"  original phones: {phones}\n"
+                    f"  reconstructed phones: "
+                    f"{reconstructed_phones}"
+                )
+
+            # ----------------------------------------------------
+            # Aggregate phone timings into syllable timings
+            # ----------------------------------------------------
+
+            unit_records = []
+
+            phone_position = 0
+
+            for syllable_phones in syllable_phone_lists:
+
+                n_phones = len(
+                    syllable_phones
+                )
+
+                first_phone_idx = (
+                    phone_position
+                )
+
+                last_phone_idx = (
+                    phone_position
+                    + n_phones
+                    - 1
+                )
+
+                syllable_start = (
+                    times[first_phone_idx][0]
+                )
+
+                syllable_end = (
+                    times[last_phone_idx][1]
+                )
+
+                unit_records.append(
+                    {
+                        "label": "_".join(
+                            syllable_phones
+                        ),
+                        "start": syllable_start,
+                        "end": syllable_end,
+                    }
+                )
+
+                phone_position += n_phones
+
+        # ========================================================
+        # Generate adjacent unit pairs
         #
-        #   p1 p2
-        #   p2 p3
-        #   p3 p4
+        # phoneme:
+        #
+        #   p1 -> p2
+        #   p2 -> p3
         #   ...
         #
-        # context includes everything before phone2.
-        # --------------------------------------------------------
+        # syllable:
+        #
+        #   σ1 -> σ2
+        #   σ2 -> σ3
+        #   ...
+        #
+        # context contains everything before unit2.
+        # ========================================================
 
-        for i in range(1, len(phones)):
+        for i in range(
+            1,
+            len(unit_records),
+        ):
 
-            phone1 = phones[i - 1]
-            phone2 = phones[i]
+            unit1 = unit_records[i - 1]
+            unit2 = unit_records[i]
 
-            phone1_start, phone1_end = times[i - 1]
-            phone2_start, phone2_end = times[i]
-
-            context = "_".join(
-                phones[:i]
+            cumulative_context = (
+                context_sep.join(
+                    unit["label"]
+                    for unit in unit_records[:i]
+                )
             )
 
-            data["phone1_start"].append(
-                phone1_start
-            )
-            data["phone1_end"].append(
-                phone1_end
-            )
-
-            data["phone2_start"].append(
-                phone2_start
-            )
-            data["phone2_end"].append(
-                phone2_end
+            data[
+                f"{unit_name}1_start"
+            ].append(
+                unit1["start"]
             )
 
-            data["phone1"].append(
-                phone1
+            data[
+                f"{unit_name}1_end"
+            ].append(
+                unit1["end"]
             )
-            data["phone2"].append(
-                phone2
+
+            data[
+                f"{unit_name}2_start"
+            ].append(
+                unit2["start"]
+            )
+
+            data[
+                f"{unit_name}2_end"
+            ].append(
+                unit2["end"]
+            )
+
+            data[
+                f"{unit_name}1"
+            ].append(
+                unit1["label"]
+            )
+
+            data[
+                f"{unit_name}2"
+            ].append(
+                unit2["label"]
             )
 
             data["context"].append(
-                context
+                cumulative_context
             )
 
             data["word"].append(
@@ -691,17 +900,147 @@ def alignment_to_dataframe(
                 word_id
             )
 
+    output_columns = [
+        f"{unit_name}1_start",
+        f"{unit_name}1_end",
+        f"{unit_name}2_start",
+        f"{unit_name}2_end",
+        f"{unit_name}1",
+        f"{unit_name}2",
+        "context",
+        "word",
+        "word_id",
+    ]
+
     return pd.DataFrame(
         data,
-        columns=[
-            "phone1_start",
-            "phone1_end",
-            "phone2_start",
-            "phone2_end",
-            "phone1",
-            "phone2",
-            "context",
-            "word",
-            "word_id",
-        ],
+        columns=output_columns,
     )
+
+
+def format_context_with_boundaries(df, lang):
+    """
+    Injects syllable boundaries (_._) into the context string.
+    """
+    import os
+    df["word_id"] = df.apply(lambda x: f"{os.path.basename(x['art_f'])}_{x['word_id']}", axis=1)
+    
+    def get_full_ipa(group):
+        idx = group['context'].str.len().argmax() 
+        last_row = group.iloc[idx] 
+        return f"{last_row['context']}_{last_row['phone2']}"
+    
+    try:
+        full_ipas = df.groupby('word_id').apply(get_full_ipa, include_groups=False).to_dict()
+    except TypeError:
+        full_ipas = df.groupby('word_id').apply(get_full_ipa).to_dict()
+        
+    syllabified_words = {occ_id: syllabify_ipa(ipa, lang=lang) for occ_id, ipa in full_ipas.items()}
+    
+    def inject_boundaries(row):
+        occ_id = row['word_id']
+        context_len = len(row['context'].split('_')) 
+        
+        syllabified = syllabified_words[occ_id]
+        tokens = syllabified.replace('.', '_._').split('_')
+        
+        collected_tokens = []
+        phoneme_count = 0
+        
+        # FIXED: Using enumerate so we know our current index (i)
+        for i, token in enumerate(tokens):
+            collected_tokens.append(token)
+            
+            if token != '.':  
+                phoneme_count += 1
+                
+            if phoneme_count == context_len:
+                # PEEK AHEAD: If the next token in the list is a '.', grab it!
+                if i + 1 < len(tokens) and tokens[i+1] == '.':
+                    collected_tokens.append('.')
+                break
+                
+        return '_'.join(collected_tokens)
+        
+    df['context'] = df.apply(inject_boundaries, axis=1)
+
+    return df
+
+import pandas as pd
+
+def add_boundary_column(df, lang):
+    """
+    Takes a DataFrame with sequential phoneme data and adds a 'cross_syllable_boundary' column.
+    Safely handles duplicate indices and multiple occurrences of the same word.
+    """
+    # 1. Create a unique ID for each continuous sequence of a word.
+    # This prevents merging Subject A's "the" with Subject B's "the".
+    import os
+    df["word_id"] = df.apply(lambda x: f"{os.path.basename(x['art_f'])}_{x['word_id']}", axis=1)
+    
+    # Helper to reconstruct the full IPA word for THIS SPECIFIC occurrence
+    def get_full_ipa(group):
+        # Using argmax and iloc completely avoids duplicate-index crashes
+        idx = group['context'].str.len().argmax()
+        last_row = group.iloc[idx]
+        return f"{last_row['context']}_{last_row['phone2']}"
+    
+    # 2. Find the full IPA sequence for each unique occurrence
+    full_ipas = df.groupby('word_id').apply(get_full_ipa).to_dict()
+    
+    # 3. Pre-calculate the exact numeric positions of boundaries
+    boundary_maps = {}
+    for occ_id, ipa in full_ipas.items():
+        syllabified = syllabify_ipa(ipa, lang=lang)
+        syllables = syllabified.split('.')
+        
+        boundary_positions = set()
+        current_pos = 0
+        
+        # We don't check the last syllable because it's the end of the word
+        for i in range(len(syllables) - 1): 
+            num_phonemes = len(syllables[i].split('_'))
+            current_pos += num_phonemes
+            boundary_positions.add(current_pos)
+            
+        boundary_maps[occ_id] = boundary_positions
+
+    # 4. Apply the logic to each row based on its specific occurrence
+    def check_boundary(row):
+        occ_id = row['word_id']
+        phoneme_count = len(row['context'].split('_'))
+        
+        # Returns 1 if True, 0 if False
+        return int(phoneme_count in boundary_maps[occ_id])
+        
+    df['cross_syllable_boundary'] = df.apply(check_boundary, axis=1)
+    
+    return df
+
+def dataset_df_to_token_df(dataset_df, unit_type="phone"):
+
+    tokens = {
+        "start": [],
+        "end": [],
+        unit_type: [],
+        "art_f": [],
+        "ac_f": [],
+        "subject": [],
+    }
+
+    metadata = set(
+        [(start, end, target, art_f, ac_f, subject) for start, end, target, art_f, ac_f, subject in zip(dataset_df[f"{unit_type}1_start"], dataset_df[f"{unit_type}1_end"], dataset_df[f"{unit_type}1"], dataset_df["art_f"], dataset_df["ac_f"], dataset_df["subject"])] + 
+        [(start, end, target, art_f, ac_f, subject) for start, end, target, art_f, ac_f, subject in zip(dataset_df[f"{unit_type}2_start"], dataset_df[f"{unit_type}2_end"], dataset_df[f"{unit_type}2"], dataset_df["art_f"], dataset_df["ac_f"], dataset_df["subject"])]
+    )
+
+    metadata = sorted(list(metadata), key=lambda x: (x[3], x[4], x[5]))
+
+    for start, end, target, art_f, ac_f, subject in metadata:
+        tokens["start"].append(start)
+        tokens["end"].append(end)
+        tokens[unit_type].append(target)
+        tokens["art_f"].append(art_f)
+        tokens["ac_f"].append(ac_f)
+        tokens["subject"].append(subject)
+
+    return pd.DataFrame(tokens)

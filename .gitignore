@@ -42,4 +42,5 @@ phone_based/pronunciation_counts/pronunciation_counts_fr.pkl
 phone_based/pronunciation_counts/pronunciation_dict_fr.pkl
 phone_based/pronunciation_counts/word_counts_fr.pkl
 
-textual_corpora/be/sentences.pickle
+*.csv
+textual_corpora/

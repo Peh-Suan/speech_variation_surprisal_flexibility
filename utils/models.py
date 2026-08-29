@@ -3,6 +3,8 @@ import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import torch.optim as optim
+import math
 
 """
 Encoders for MFCCs, EMA, and annotated MRI coordinates
@@ -331,6 +333,15 @@ class AvgPoolHW(nn.Module):
 
 
 class FlowWarp3D(nn.Module):
+    """
+    Learn a 3D deformation field for one view.
+
+    Input:
+        (B, C, D, H, W)
+
+    Output:
+        warped tensor with the same shape
+    """
 
     def __init__(
         self,
@@ -367,31 +378,34 @@ class FlowWarp3D(nn.Module):
             ),
         )
 
+        # Start from identity transformation.
+        nn.init.zeros_(
+            self.flow_predictor[-1].weight
+        )
+        nn.init.zeros_(
+            self.flow_predictor[-1].bias
+        )
+
     def forward(self, x):
 
         B, C, D, H, W = x.shape
 
         flow = self.flow_predictor(x)
+        # (B, 3, D, H, W)
 
         grid_z, grid_y, grid_x = torch.meshgrid(
             torch.linspace(
-                -1,
-                1,
-                D,
+                -1, 1, D,
                 device=x.device,
                 dtype=x.dtype,
             ),
             torch.linspace(
-                -1,
-                1,
-                H,
+                -1, 1, H,
                 device=x.device,
                 dtype=x.dtype,
             ),
             torch.linspace(
-                -1,
-                1,
-                W,
+                -1, 1, W,
                 device=x.device,
                 dtype=x.dtype,
             ),
@@ -399,20 +413,19 @@ class FlowWarp3D(nn.Module):
         )
 
         base_grid = torch.stack(
-            (
-                grid_x,
-                grid_y,
-                grid_z,
-            ),
+            (grid_x, grid_y, grid_z),
             dim=-1,
         )
+        # (D, H, W, 3)
 
         base_grid = (
             base_grid
             .unsqueeze(0)
             .expand(B, -1, -1, -1, -1)
         )
+        # (B, D, H, W, 3)
 
+        # Convert voxel displacement to normalized grid coordinates.
         norm_factor = torch.tensor(
             [
                 W / 2,
@@ -422,35 +435,27 @@ class FlowWarp3D(nn.Module):
             device=x.device,
             dtype=x.dtype,
         ).view(
-            1,
-            3,
-            1,
-            1,
-            1,
+            1, 3, 1, 1, 1
         )
 
-        flow = flow / norm_factor
-
-        flow = flow.permute(
-            0,
-            2,
-            3,
-            4,
-            1,
+        flow_norm = (
+            flow / norm_factor
+        ).permute(
+            0, 2, 3, 4, 1
         )
+        # (B, D, H, W, 3)
 
         sampling_grid = (
-            base_grid + flow
+            base_grid + flow_norm
         )
 
-        # Optional fallback for devices where 3D grid_sample
-        # is unsupported/problematic.
+        original_device = x.device
+
         if (
             self.cpu_fallback
             and x.device.type == "mps"
         ):
-
-            out = F.grid_sample(
+            warped = F.grid_sample(
                 x.cpu(),
                 sampling_grid.cpu(),
                 mode="bilinear",
@@ -458,7 +463,9 @@ class FlowWarp3D(nn.Module):
                 align_corners=True,
             )
 
-            return out.to(x.device)
+            return warped.to(
+                original_device
+            )
 
         return F.grid_sample(
             x,
@@ -466,6 +473,72 @@ class FlowWarp3D(nn.Module):
             mode="bilinear",
             padding_mode="border",
             align_corners=True,
+        )
+
+class SeparateViewFlowWarp3D(nn.Module):
+    """
+    Apply an independent FlowWarp3D to each input view.
+
+    Input:
+        (B, V, D, H, W)
+
+    where V is the number of views.
+
+    For BE-US:
+        V = 2
+        view 0 = ultrasound
+        view 1 = lip video
+    """
+
+    def __init__(
+        self,
+        num_views,
+        cpu_fallback=False,
+    ):
+        super().__init__()
+
+        self.num_views = num_views
+
+        self.view_warpers = nn.ModuleList([
+            FlowWarp3D(
+                input_channels=1,
+                cpu_fallback=cpu_fallback,
+            )
+            for _ in range(num_views)
+        ])
+
+    def forward(self, x):
+
+        B, V, D, H, W = x.shape
+
+        if V != self.num_views:
+            raise ValueError(
+                f"Expected {self.num_views} views, "
+                f"got {V}."
+            )
+
+        warped_views = []
+
+        for view_idx, warper in enumerate(
+            self.view_warpers
+        ):
+
+            # Keep channel dimension:
+            # (B, 1, D, H, W)
+            view = x[
+                :,
+                view_idx:view_idx + 1,
+            ]
+
+            warped_view = warper(view)
+
+            warped_views.append(
+                warped_view
+            )
+
+        return torch.cat(
+            warped_views,
+            dim=1,
         )
 
 
@@ -491,7 +564,7 @@ class VideoAutoencoder(nn.Module):
         encoder_channels=(64, 32, 16, 4),
         mlp_hidden=(4096, 2048),
         use_mlp=True,
-        use_stn=True,
+        stn_mode="shared",
         grid_sample_cpu_fallback=False,
     ):
         super().__init__()
@@ -500,7 +573,7 @@ class VideoAutoencoder(nn.Module):
         self.input_channels = input_channels
         self.latent_dim = latent_dim
         self.use_mlp = use_mlp
-        self.use_stn = use_stn
+        self.stn_mode = stn_mode
 
         D, H, W = self.input_shape
 
@@ -543,7 +616,13 @@ class VideoAutoencoder(nn.Module):
         # Spatial transformers
         # ============================================================
 
-        if use_stn:
+        if self.stn_mode == "none":
+
+            self.encoder_stn = nn.Identity()
+            self.decoder_stn = nn.Identity()
+
+        elif self.stn_mode == "shared":
+
             self.encoder_stn = FlowWarp3D(
                 input_channels=input_channels,
                 cpu_fallback=grid_sample_cpu_fallback,
@@ -553,9 +632,25 @@ class VideoAutoencoder(nn.Module):
                 input_channels=input_channels,
                 cpu_fallback=grid_sample_cpu_fallback,
             )
+
+        elif self.stn_mode == "separate":
+
+            self.encoder_stn = SeparateViewFlowWarp3D(
+                num_views=input_channels,
+                cpu_fallback=grid_sample_cpu_fallback,
+            )
+
+            self.decoder_stn = SeparateViewFlowWarp3D(
+                num_views=input_channels,
+                cpu_fallback=grid_sample_cpu_fallback,
+            )
+
         else:
-            self.encoder_stn = nn.Identity()
-            self.decoder_stn = nn.Identity()
+
+            raise ValueError(
+                f"Unknown stn_mode: {self.stn_mode!r}. "
+                f"Expected 'none', 'shared', or 'separate'."
+            )
 
         # ============================================================
         # Conv3D encoder
@@ -912,3 +1007,148 @@ class VideoAutoencoder(nn.Module):
             return out, latent
 
         return out
+
+class MDN(nn.Module):
+
+    def __init__(
+        self,
+        x_dim,
+        y_dim,
+        n_components=5,
+        hidden_dim=128,
+        sigma_min=0.05,
+        sigma_max=10.0,
+    ):
+
+        super().__init__()
+
+        self.n_components = n_components
+        self.y_dim = y_dim
+
+        self.logsigma_min = math.log(sigma_min)
+        self.logsigma_max = math.log(sigma_max)
+
+        self.net = nn.Sequential(
+            nn.Linear(x_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.ReLU(),
+        )
+
+        self.pi_head = nn.Linear(
+            hidden_dim,
+            n_components,
+        )
+
+        self.mu_head = nn.Linear(
+            hidden_dim,
+            n_components * y_dim,
+        )
+
+        self.logsigma_head = nn.Linear(
+            hidden_dim,
+            n_components * y_dim,
+        )
+
+    def forward(self, x):
+
+        h = self.net(x)
+
+        # ----------------------------------------
+        # Mixture weights
+        # ----------------------------------------
+
+        log_pi = F.log_softmax(
+            self.pi_head(h),
+            dim=1,
+        )
+
+        # ----------------------------------------
+        # Means
+        # ----------------------------------------
+
+        mu = self.mu_head(h).view(
+            -1,
+            self.n_components,
+            self.y_dim,
+        )
+
+        # ----------------------------------------
+        # Standard deviations
+        # ----------------------------------------
+
+        raw_logsigma = (
+            self.logsigma_head(h)
+            .view(
+                -1,
+                self.n_components,
+                self.y_dim,
+            )
+        )
+
+        # CRITICAL:
+        # prevent variance collapse / overflow
+        logsigma = torch.clamp(
+            raw_logsigma,
+            min=self.logsigma_min,
+            max=self.logsigma_max,
+        )
+
+        return log_pi, mu, logsigma
+
+    def log_prob(self, x, y):
+
+        """
+        x: (B, x_dim)
+        y: (B, y_dim)
+
+        Returns:
+            log q_phi(y | x), shape (B,)
+        """
+
+        log_pi, mu, logsigma = self(x)
+
+        # (B, D) -> (B, 1, D)
+        # Broadcasting handles the K components;
+        # no need to explicitly expand.
+        y = y.unsqueeze(1)
+
+        # ----------------------------------------
+        # Gaussian log-density
+        # ----------------------------------------
+
+        inv_var = torch.exp(
+            -2.0 * logsigma
+        )
+
+        sq_error = (
+            (y - mu) ** 2
+        )
+
+        log_exp = -0.5 * (
+            sq_error * inv_var
+        ).sum(dim=2)
+
+        log_det = logsigma.sum(
+            dim=2
+        )
+
+        log_norm = (
+            -0.5
+            * self.y_dim
+            * math.log(2.0 * math.pi)
+            - log_det
+        )
+
+        log_comp = (
+            log_norm + log_exp
+        )
+
+        # ----------------------------------------
+        # Mixture probability in log space
+        # ----------------------------------------
+
+        return torch.logsumexp(
+            log_pi + log_comp,
+            dim=1,
+        )
