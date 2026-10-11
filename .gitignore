@@ -44,3 +44,12 @@ phone_based/pronunciation_counts/word_counts_fr.pkl
 
 *.csv
 textual_corpora/
+.cache/
+
+# Derived artefacts and scratch, kept out of the repo
+*.pkl
+*.pickle
+analysis/_scratch/
+runs/logs/
+Claude outputs/
+_superseded/

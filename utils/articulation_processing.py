@@ -74,7 +74,7 @@ def interpolate_missing_frames(features):
 
     return features
 
-def get_aeema_articulatory_features(mat_f, start, end, target_num_frames=10, scalers=None):
+def get_aeema_articulatory_features(mat_f, start, end):
     data = process_ema_mat(mat_f)
 
     start_time = start  # in seconds
@@ -100,14 +100,7 @@ def get_aeema_articulatory_features(mat_f, start, end, target_num_frames=10, sca
     if features is None:
         return None
 
-    if scalers is not None:
-        for idx in range(features.shape[1]):
-            features[:, idx] = scalers[idx].transform(features[:, idx].reshape(-1, 1)).flatten()
-
-    new_t = np.linspace(0, features.shape[0] - 1, target_num_frames)
-    f = interp1d(np.arange(features.shape[0]), features, axis=0, kind='linear')
-
-    x = f(new_t).reshape(target_num_frames, 6 * 3)
+    x = features
 
     if not np.isfinite(x).all():
         return None
@@ -416,9 +409,7 @@ def interpolate(X, n=5):
 def get_aemri75anno_articulatory_features(
     mat_f,
     start,
-    end,
-    target_num_frames=5,
-    scalers=None,
+    end
 ):
     from scipy.io import loadmat
     import cv2
@@ -530,11 +521,6 @@ def get_aemri75anno_articulatory_features(
         axis=0,
     )
 
-    features = interpolate(
-        features,
-        n=target_num_frames,
-    )
-
     if features is None:
         return None
 
@@ -546,35 +532,6 @@ def get_aemri75anno_articulatory_features(
 
     if not np.isfinite(features).all():
         return None
-
-    if scalers is not None:
-
-        expected_indices = set(
-            range(features.shape[1])
-        )
-
-        missing = (
-            expected_indices
-            - set(scalers)
-        )
-
-        if missing:
-            raise ValueError(
-                f"Missing scalers for {len(missing)} "
-                f"feature dimensions."
-            )
-
-        for idx in range(
-            features.shape[1]
-        ):
-            features[:, idx] = (
-                scalers[idx]
-                .transform(
-                    features[:, idx]
-                    .reshape(-1, 1)
-                )
-                .ravel()
-            )
 
     return features
 
@@ -591,43 +548,6 @@ from scipy.interpolate import interp1d
 # ============================================================
 # Shared utilities
 # ============================================================
-
-def _resample_frames(frames, target_num_frames):
-    """
-    Resample video frames along the time dimension.
-
-    Input:
-        frames: (T, H, W)
-
-    Output:
-        (target_num_frames, H, W)
-    """
-    frames = np.asarray(frames, dtype=np.float32)
-
-    if frames.shape[0] == 0:
-        return None
-
-    # If there is only one frame, interpolation is impossible.
-    # Just repeat it.
-    if frames.shape[0] == 1:
-        return np.repeat(
-            frames,
-            target_num_frames,
-            axis=0
-        )
-
-    old_t = np.linspace(0, 1, frames.shape[0])
-    new_t = np.linspace(0, 1, target_num_frames)
-
-    interpolator = interp1d(
-        old_t,
-        frames,
-        axis=0,
-        kind="linear"
-    )
-
-    return interpolator(new_t).astype(np.float32)
-
 
 def _normalize_frames(frames):
     """
@@ -700,13 +620,13 @@ def _get_mri_articulatory_features(
     file_path,
     start,
     end,
-    target_num_frames
+    stats=None
 ):
     """
     Shared implementation for all three MRI datasets.
 
     Returns:
-        (1, T, H, W)
+        (T, H, W)
     """
     frames = _read_video_segment(
         file_path,
@@ -717,25 +637,17 @@ def _get_mri_articulatory_features(
     if frames is None:
         return None
 
-    frames = _resample_frames(
-        frames,
-        target_num_frames
-    )
+    if stats is not None:
+        mean, sd = stats
+        frames = ((frames - mean) / sd).astype(np.float32)
 
-    if frames is None:
-        return None
-
-    frames = _normalize_frames(frames)
-
-    # Channel dimension:
-    # (T, H, W) -> (1, T, H, W)
-    return frames[np.newaxis, ...].astype(np.float32)
+    return frames.astype(np.float32)
 
 def get_aemri_articulatory_features(
     file_path,
     start,
     end,
-    target_num_frames=5
+    stats=None
 ):
     """
     USC-TIMIT MRI.
@@ -744,20 +656,20 @@ def get_aemri_articulatory_features(
     start/end: seconds
 
     Returns:
-        (1, target_num_frames, H, W)
+        (T, H, W)
     """
     return _get_mri_articulatory_features(
         file_path=file_path,
         start=start,
         end=end,
-        target_num_frames=target_num_frames
+        stats=stats
     )
 
 def get_frmri_articulatory_features(
     file_path,
     start,
     end,
-    target_num_frames=5
+    stats=None
 ):
     """
     French MRI.
@@ -766,20 +678,20 @@ def get_frmri_articulatory_features(
     start/end: seconds
 
     Returns:
-        (1, target_num_frames, H, W)
+        (T, H, W)
     """
     return _get_mri_articulatory_features(
         file_path=file_path,
         start=start,
         end=end,
-        target_num_frames=target_num_frames
+        stats=stats
     )
 
 def get_aemri75_articulatory_features(
     file_path,
     start,
     end,
-    target_num_frames=5
+    stats=None
 ):
     """
     USC-75 MRI.
@@ -788,202 +700,118 @@ def get_aemri75_articulatory_features(
     start/end: seconds
 
     Returns:
-        (1, target_num_frames, H, W)
+        (T, H, W)
     """
     return _get_mri_articulatory_features(
         file_path=file_path,
         start=start,
         end=end,
-        target_num_frames=target_num_frames
+        stats=stats
     )
 
 # ============================================================
 # Ultrasound + lip imaging video data
 # ============================================================
 
-def _mask_ultrasound_image(img):
-    """
-    Same fan mask as your original UltrasoundVideoDataset.
-    """
-    h, w = img.shape
-
-    cx = w // 2
-    cy = h + 6
-
-    X, Y = np.meshgrid(
-        np.arange(w),
-        np.arange(h)
-    )
-
-    dx = X - cx
-    dy = cy - Y
-
-    radius = np.sqrt(dx**2 + dy**2)
+def _mask_ultrasound_image_bool(h, w):
+    """The fan mask as a boolean array, so it can be reused rather than re-derived."""
+    cx, cy = w // 2, h + 6
+    X, Y = np.meshgrid(np.arange(w), np.arange(h))
+    dx, dy = X - cx, cy - Y
+    radius = np.sqrt(dx ** 2 + dy ** 2)
     angle = np.arctan2(dy, dx)
+    return ((radius >= 25) & (radius <= 60)
+            & (angle >= (np.pi / 3) * 0.7) & (angle <= (np.pi / 3) * 2.35))
 
-    inner_radius = 25
-    outer_radius = 60
-
-    angle_min = (np.pi / 3) * 0.7
-    angle_max = (np.pi / 3) * 2.35
-
-    mask = (
-        (radius >= inner_radius)
-        & (radius <= outer_radius)
-        & (angle >= angle_min)
-        & (angle <= angle_max)
-    )
-
-    masked_img = np.zeros_like(img)
-    masked_img[mask] = img[mask]
-
-    return masked_img
+from functools import lru_cache
+import numpy as np
+import cv2
+import os
 
 
-def get_beus_articulatory_features(
-    file_path,
-    start,
-    end,
-    target_num_frames=10,
-    spatial_size=112
-):
-    """
-    Extract an arbitrary time segment from a full BE ultrasound recording.
+@lru_cache(maxsize=32)
+def _load_beus_frames(file_path):
+    # Does NOT load the whole recording into RAM.
+    return np.load(file_path, mmap_mode="r")
 
-    Parameters
-    ----------
-    file_path : str
-        Path to the full recording's *_frames.npy file.
 
-        Example:
-        /.../00me_024_whi_frames.npy
+@lru_cache(maxsize=256)
+def _load_beus_fps(fps_path):
+    return float(np.asarray(np.load(fps_path)).squeeze())
 
-    start : float
-        Segment start time in seconds.
 
-    end : float
-        Segment end time in seconds.
+@lru_cache(maxsize=16)
+def _cached_ultrasound_mask(h, w):
+    return _mask_ultrasound_image_bool(h, w)
 
-    target_num_frames : int
-        Number of temporal frames in the returned representation.
 
-    spatial_size : int or None
-        Resize each original frame to spatial_size x spatial_size
-        before splitting ultrasound/lips.
-
-        Default 112 matches the dimensions expected by your
-        previous preprocessing.
-
-        Set to None to retain the original 224 x 224 resolution.
-
-    Returns
-    -------
-    x : np.ndarray
-        Shape:
-            (2, target_num_frames, H/2, W)
-
-        Channel 0 = ultrasound
-        Channel 1 = lips
-
-        With spatial_size=112:
-            (2, target_num_frames, 56, 112)
-    """
+def _beus_streams(file_path, spatial_size=112, start=None, end=None):
 
     if file_path is None or not os.path.exists(file_path):
         return None
 
-    # --------------------------------------------------
-    # Find associated FPS file
-    # --------------------------------------------------
     if not file_path.endswith("_frames.npy"):
-        raise ValueError(
-            "file_path should point to a *_frames.npy file."
-        )
+        raise ValueError("file_path should point to a *_frames.npy file.")
 
-    fps_path = file_path.replace(
-        "_frames.npy",
-        "_fps.npy"
-    )
+    fps_path = file_path.replace("_frames.npy", "_fps.npy")
 
     if not os.path.exists(fps_path):
-        raise FileNotFoundError(
-            f"FPS file not found: {fps_path}"
-        )
+        raise FileNotFoundError(f"FPS file not found: {fps_path}")
 
-    # --------------------------------------------------
-    # Load complete recording
-    # --------------------------------------------------
-    frames = np.load(file_path).astype(np.float32)
-    fps = float(np.asarray(np.load(fps_path)).squeeze())
+    # -----------------------------
+    # Memory-map instead of loading
+    # -----------------------------
+    frames_all = _load_beus_frames(file_path)
+    fps = _load_beus_fps(fps_path)
 
-    if frames.ndim != 3:
+    if frames_all.ndim != 3:
         raise ValueError(
-            f"Expected video shape (T, H, W), "
-            f"got {frames.shape}"
+            f"Expected video shape (T, H, W), got {frames_all.shape}"
         )
 
     if not np.isfinite(fps) or fps <= 0:
-        raise ValueError(
-            f"Invalid FPS: {fps}"
-        )
+        raise ValueError(f"Invalid FPS: {fps}")
 
-    # --------------------------------------------------
-    # Convert seconds -> frame indices
-    # --------------------------------------------------
-    start_frame = round(start * fps)
-    end_frame = round(end * fps)
+    # -----------------------------
+    # Slice FIRST
+    # -----------------------------
+    if start is not None and end is not None:
 
-    # Prevent going outside recording boundaries
-    start_frame = max(0, start_frame)
-    end_frame = min(
-        end_frame,
-        frames.shape[0] - 1
-    )
+        a = max(0, round(start * fps))
+        b = min(round(end * fps), frames_all.shape[0] - 1)
 
-    if end_frame < start_frame:
-        return None
+        if b < a:
+            return None
 
-    # Include end frame, consistent with your MRI code
-    frames = frames[
-        start_frame:end_frame + 1
-    ]
+        frames = frames_all[a:b + 1]
+
+    else:
+        frames = frames_all
 
     if frames.shape[0] == 0:
         return None
 
+    # -----------------------------
+    # Convert only requested frames
+    # -----------------------------
+    frames = np.asarray(frames, dtype=np.float32)
+
     if not np.isfinite(frames).all():
         return None
 
-    # --------------------------------------------------
-    # Resize spatial dimensions if desired
-    # --------------------------------------------------
+    # -----------------------------
+    # Resize only requested frames
+    # -----------------------------
     if spatial_size is not None:
-        frames = np.stack(
-            [
-                cv2.resize(
-                    frame,
-                    (spatial_size, spatial_size),
-                    interpolation=cv2.INTER_AREA
-                )
-                for frame in frames
-            ],
-            axis=0
-        )
+        frames = np.stack([
+            cv2.resize(
+                f,
+                (spatial_size, spatial_size),
+                interpolation=cv2.INTER_AREA,
+            )
+            for f in frames
+        ])
 
-    # --------------------------------------------------
-    # Resample time
-    # --------------------------------------------------
-    frames = _resample_frames(
-        frames,
-        target_num_frames
-    )
-
-    if frames is None:
-        return None
-
-    # --------------------------------------------------
-    # Split ultrasound / lips
-    # --------------------------------------------------
     height = frames.shape[1]
 
     if height % 2 != 0:
@@ -991,34 +819,54 @@ def get_beus_articulatory_features(
             f"Frame height must be divisible by 2, got {height}"
         )
 
-    half_height = height // 2
+    half = height // 2
 
-    ultrasound = frames[:, :half_height, :]
-    lips = frames[:, half_height:, :]
+    ultrasound = frames[:, :half, :].copy()
+    lips = frames[:, half:, :].copy()
 
-    # --------------------------------------------------
-    # Ultrasound fan mask
-    # --------------------------------------------------
-    ultrasound = np.stack(
-        [
-            _mask_ultrasound_image(frame)
-            for frame in ultrasound
-        ],
-        axis=0
+    mask = _cached_ultrasound_mask(
+        ultrasound.shape[1],
+        ultrasound.shape[2],
     )
 
-    # --------------------------------------------------
-    # Normalize independently
-    # --------------------------------------------------
-    ultrasound = _normalize_frames(ultrasound)
-    lips = _normalize_frames(lips)
+    ultrasound[:, ~mask] = 0.0
 
-    # --------------------------------------------------
-    # Combine streams
-    # --------------------------------------------------
-    x = np.stack(
-        [ultrasound, lips],
-        axis=0
-    ).astype(np.float32)
+    return ultrasound, lips, mask
 
+def get_beus_articulatory_features(file_path, start, end, spatial_size=112,
+                                   stats=None):
+    """
+    Extract one segment from a BE ultrasound recording.
+ 
+    Returns
+    -------
+    (T, 2, H/2, W) float32, TIME-FIRST.
+        view 0 = ultrasound (fan-masked), view 1 = lips.
+        With spatial_size=112: (T, 2, 56, 112).
+ 
+    `stats`: ((us_mean, us_sd), (lip_mean, lip_sd)) from beus_recording_stats
+        for THIS recording. Required — see the note below.
+    """
+    out = _beus_streams(file_path, spatial_size, start, end)
+    if out is None:
+        return None
+    us, lp, mask = out
+ 
+    if stats is None:
+        # Deliberately not falling back to per-token normalisation: that forces
+        # every segment to mean 0 / sd 1 and erases all between-token intensity
+        # variation, which is part of what distinguishes the tokens. Silently
+        # doing it on a forgotten argument is worse than stopping.
+        raise ValueError(
+            "stats is required: pass beus_recording_stats(file_path, spatial_size) "
+            "for this recording. Without it these are raw pixel values.")
+ 
+    (us_mean, us_sd), (lip_mean, lip_sd) = stats
+    us = (us - us_mean) / us_sd
+    us[:, ~mask] = 0.0          # keep the out-of-fan region at exactly 0
+    lp = (lp - lip_mean) / lip_sd
+ 
+    x = np.stack([us, lp], axis=1).astype(np.float32)    # (T, 2, H/2, W)
+    if not np.isfinite(x).all():
+        return None
     return x
